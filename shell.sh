@@ -25,12 +25,9 @@ qtd_ind_status()
 { 
     arq=$1
     #remove equivalencia 2019, pega colunas grr e status, tira cabeçalho, remove linhas repetidas, joga em qtd.csv
-    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA"  $arq | cut -d, -f'1,10' | grep -v "matricula" | uniq -u >> qtd.csv
-    for status in {"Matriculado","Aprovado","R-freq","R-nota","Cancelado"}
-    do
-        echo -e -n "$status " 
-        grep $status --count qtd.csv
-    done
+    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | cut -d, -f'1,10' | grep -v "status" | uniq -u >> qtd.csv
+    sort -t, -k2 qtd.csv | cut -d, -f2 | uniq -c 
+    
     rm qtd.csv
 }
 
@@ -65,7 +62,15 @@ perc_aprov_reprov_ano()
     do
         ano="$i_taxa.txt"
         grep "$i" $novo | sort -t, -k2 | uniq -c >> $ano
-        cat $ano
+        Aprov=$(grep "Aprovado" $ano | cut -d' ' -f5)
+        Rnot=$(grep "R-nota" $ano | cut -d' ' -f5)
+        Rfreq=$(grep "R-freq" $ano | cut -d' ' -f5)
+        Cancel=$(grep "Cancelado" $ano | cut -d' ' -f5)
+        R=$(grep "Reprovado" $ano | cut -d' ' -f5)
+        echo "a$Aprov r$Rnot r$Rfreq c$Cancel r$R"
+        Reprov=$(expr $R + $Cancel + $Rfreq + $Rnot)
+        Total=$(expr $Reprov + $Aprov)
+        echo "a$Aprov r$Rnot r$Rfreq c$Cancel r$R R$Reprov T$Total"
         rm $ano
     done
     rm $novo
