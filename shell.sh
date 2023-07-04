@@ -4,16 +4,18 @@
 
 main()
 {
-    #remove_2_2022
-    qtd_ind_status
-    #max_vez_cursado
+    arq="historico-alg1_SIGA_ANONIMIZADO.csv"
+    #remove_2_2022 $arq
+    #qtd_ind_status $arq
+    #max_vez_cursado $arq
+    perc_aprov_reprov_ano $arq
 }
 
 
 #função que remove que remove todas as linhas que façam parte de 2-2022
 function remove_2_2022()
 {
-    arq="historico-alg1_SIGA_ANONIMIZADO.csv" 
+    arq=$1 
     grep -v "2,2022" $arq 
 }
 
@@ -21,8 +23,8 @@ function remove_2_2022()
 #calculo do numero de individuos unicos para tal status
 qtd_ind_status()
 { 
-    arq="historico-alg1_SIGA_ANONIMIZADO.csv"
-    #remove equivalencia 2019, pega colunas grr e status, tira cabeçalho, remove linhas repetidas
+    arq=$1
+    #remove equivalencia 2019, pega colunas grr e status, tira cabeçalho, remove linhas repetidas, joga em qtd.csv
     grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA"  $arq | cut -d, -f'1,10' | grep -v "matricula" | uniq -u >> qtd.csv
     for status in {"Matriculado","Aprovado","R-freq","R-nota","Cancelado"}
     do
@@ -36,17 +38,38 @@ qtd_ind_status()
 #quantos individuos possuem o mesmo numero
 max_vez_cursado()
 {
-    arq="historico-alg1_SIGA_ANONIMIZADO.csv"
-    novo="qtd_cursado/ind.txt"
-    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq 
-    #rm $novo
+    arq=$1
+    novo="qtd_cursado_ind.txt"
+    #remove equivalencia 2019, tira cabeçalho, pega a primeira coluna de grrs, joga em qtd_cursado_ind.txt
+    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | grep -v "matricula" | cut -d, -f'1' >> $novo
+    
+    #quantas pessoas fizeram o numero máximo de vezes
+    p=$(uniq -c $novo | cut -d' ' -f7 | sort | uniq -c | tail -n1 | cut -d' ' -f7 )  
+    #quantas vezes estas pessoas fizeram
+    qtd=$(uniq -c $novo | cut -d' ' -f7 | sort | uniq -c | tail -n1 | cut -d' ' -f8)
+    echo -e "\t$p passaram por ALG1 $qtd vezes"
+    rm $novo
 }
 
 #porcentagem aprovação e reprovação por ano
-#perc_aprov_reprov_ano()
-#{
-
-#}
+perc_aprov_reprov_ano()
+{
+    arq=$1
+    novo="nao_sei_oq.txt"
+    #remove equivalencia 2019, tira cabeçalho, ordena por ano, pega as colunas de ano e status
+    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | grep -v "matricula" | sort -t, -k5 | cut -d, -f'5,10' | grep -v "Matriculado">> $novo
+    
+    min=$(cut -d, -f1 $novo | head -n1)
+    max=$(cut -d, -f1 $novo | tail -n1)
+    for ((i=$min; i<=$max; i++))
+    do
+        ano="$i_taxa.txt"
+        grep "$i" $novo | sort -t, -k2 | uniq -c >> $ano
+        cat $ano
+        rm $ano
+    done
+    rm $novo
+}
 
 #media de nota de aprovados por ano e periodo
 #media_nota_aprov()
