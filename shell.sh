@@ -78,6 +78,7 @@ max_vez_cursado()
 #}
 
 #rendimento dos alunos em 2022-1 em relação a pandemia e anos anteriores
+<<<<<<< HEAD
 #rend_after_pand()
 #{
 
@@ -124,3 +125,15 @@ main
 # rm [arquivo] - remove [arquivo] (este arquivo é removido do sistema, não
 #   existe “lixeira” para o rm);
 # rmdir [diretório] - remove um diretório, desde que esteja vazio.
+=======
+rend_after_pand()
+{
+
+}
+
+
+
+
+
+#
+>>>>>>> 985a2bf45a74ea719d8140f556adad113b270ade
