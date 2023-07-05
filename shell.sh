@@ -8,7 +8,8 @@ main()
     #remove_2_2022 $arq
     #qtd_ind_status $arq
     #max_vez_cursado $arq
-    perc_aprov_reprov_ano $arq
+    #perc_aprov_reprov_ano $arq
+    media_nota_aprov $arq
 }
 
 
@@ -24,11 +25,12 @@ function remove_2_2022()
 qtd_ind_status()
 { 
     arq=$1
-    #remove equivalencia 2019, pega colunas grr e status, tira cabeçalho, remove linhas repetidas, joga em qtd.csv
-    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | cut -d, -f'1,10' | grep -v "status" | uniq -u >> qtd.csv
-    sort -t, -k2 qtd.csv | cut -d, -f2 | uniq -c 
+    temp="temp.txt"
+    #remove equivalencia 2019, pega colunas grr e status, tira cabeçalho, remove linhas repetidas, joga em temp
+    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | cut -d, -f'1,10' | grep -v "status" | uniq -u >> $temp
+    sort -t, -k2 $temp | cut -d, -f2 | uniq -c 
     
-    rm qtd.csv
+    rm $temp
 }
 
 #máximo de vezes que um individuo cursou antes de ser aprovado
@@ -36,51 +38,83 @@ qtd_ind_status()
 max_vez_cursado()
 {
     arq=$1
-    novo="qtd_cursado_ind.txt"
-    #remove equivalencia 2019, tira cabeçalho, pega a primeira coluna de grrs, joga em qtd_cursado_ind.txt
-    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | grep -v "matricula" | cut -d, -f'1' >> $novo
+    temp="temp.txt"
+    #remove equivalencia 2019, tira cabeçalho, pega a primeira coluna de grrs, joga em temp.txt
+    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | grep -v "matricula" | cut -d, -f'1' >> $temp
     
     #quantas pessoas fizeram o numero máximo de vezes
-    p=$(uniq -c $novo | cut -d' ' -f7 | sort | uniq -c | tail -n1 | cut -d' ' -f7 )  
+    p=$(uniq -c $temp | cut -d' ' -f7 | sort | uniq -c | tail -n1 | cut -d' ' -f7 )  
     #quantas vezes estas pessoas fizeram
-    qtd=$(uniq -c $novo | cut -d' ' -f7 | sort | uniq -c | tail -n1 | cut -d' ' -f8)
+    qtd=$(uniq -c $temp | cut -d' ' -f7 | sort | uniq -c | tail -n1 | cut -d' ' -f8)
     echo -e "\t$p passaram por ALG1 $qtd vezes"
-    rm $novo
+    rm $temp
 }
 
 #porcentagem aprovação e reprovação por ano
 perc_aprov_reprov_ano()
 {
     arq=$1
-    novo="nao_sei_oq.txt"
-    #remove equivalencia 2019, tira cabeçalho, ordena por ano, pega as colunas de ano e status
-    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | grep -v "matricula" | sort -t, -k5 | cut -d, -f'5,10' | grep -v "Matriculado">> $novo
+    temp="temp.txt"
+    #remove equivalencia 2019, tira cabeçalho, ordena por ano, pega as colunas de ano e status, remove os ainda matriculados
+    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | grep -v "matricula" | sort -t, -k5 | cut -d, -f'5,10' | grep -v "Matriculado">> $temp
     
-    min=$(cut -d, -f1 $novo | head -n1)
-    max=$(cut -d, -f1 $novo | tail -n1)
+    #menor e maior ano obtidos nos dados
+    min=$(cut -d, -f1 $temp | head -n1)
+    max=$(cut -d, -f1 $temp | tail -n1)
+    #calculo da porcentagem para cada ano
     for ((i=$min; i<=$max; i++))
     do
-        ano="$i_taxa.txt"
-        grep "$i" $novo | sort -t, -k2 | uniq -c >> $ano
-        Aprov=$(grep "Aprovado" $ano | cut -d' ' -f5)
-        Rnot=$(grep "R-nota" $ano | cut -d' ' -f5)
-        Rfreq=$(grep "R-freq" $ano | cut -d' ' -f5)
-        Cancel=$(grep "Cancelado" $ano | cut -d' ' -f5)
-        R=$(grep "Reprovado" $ano | cut -d' ' -f5)
-        echo "a$Aprov r$Rnot r$Rfreq c$Cancel r$R"
-        Reprov=$(expr $R + $Cancel + $Rfreq + $Rnot)
-        Total=$(expr $Reprov + $Aprov)
-        echo "a$Aprov r$Rnot r$Rfreq c$Cancel r$R R$Reprov T$Total"
+        ano='$i_taxa.txt'
+        
+        #joga em um arquivo PE:"2020_taxa.txt" a quantidade de aprovados, reprovados por nota, por frequencia, ou cancelados
+        grep "$i" $temp | sort -t, -k2 | cut -d, -f2 >> $ano
+        
+        #calculo da porcentagem de aprovados e reprovados em cada ano
+        aprov=$(grep -c "Aprovado" $ano)
+        reprov=$(grep -cv "Aprovado" $ano)
+        total=$(expr $aprov + $reprov)
+        aprov=$(expr $aprov \* 100)
+        reprov=$(expr $reprov \* 100)
+        aprov=$(expr $aprov / $total)
+        reprov=$(expr $reprov / $total)
+        
+        echo "$aprov% aprovados e $reprov% reprovados em $i"
         rm $ano
     done
-    rm $novo
+    
+    rm $temp
 }
 
 #media de nota de aprovados por ano e periodo
-#media_nota_aprov()
-#{
-
-#}
+media_nota_aprov()
+{
+    arq=$1
+    temp="temp.txt"
+    #remove equivalencia 2019, tira cabeçalho, 
+    grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | grep -v "matricula" | cut -d, -f1,4,5,8,10 | sort -t, -k3 >> $temp
+    
+    min=$(grep Aprovado | cut -d, -f3 $temp | head -n1)
+    max=$(grep Aprovado | cut -d, -f3 $temp | tail -n1)
+    #calculo da porcentagem para cada ano
+    for ((ano=$min; ano<$max; ano++))
+    do
+        taxa='taxa.txt'
+        qtd=$(grep Aprovado | grep -c "$ano" $temp) 
+        echo "$qtd em $ano"
+        grep Aprovado | grep "$ano" $temp | cut -d, -f1,2,4 >> $taxa
+        echo "here"
+        soma=0
+        for ((j=0; j<$qtd; j++))
+        do
+            soma=$(expr $soma + $(cut -d, -f3 | head -n1))
+        done
+        echo "total: $soma em $ano"
+        cat $taxa
+        echo "--"
+        rm $taxa    
+    done
+    rm $temp
+}
 
 #media de nota de reprovados por nota por ano e periodo
 #media_nota_reprov()
