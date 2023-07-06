@@ -5,15 +5,15 @@
 main()
 {
     arq="historico-alg1_SIGA_ANONIMIZADO.csv"
-    #remove_2_2022 $arq
-    #qtd_ind_status $arq
-    #max_vez_cursado $arq
-    #perc_aprov_reprov_ano $arq
-    #media_nota_aprov $arq
-    #media_nota_reprov $arq
-    #media_freq_reprov $arq
-    #perc_evasoes $arq
-    #rend_pand $arq
+    remove_2_2022 $arq
+    qtd_ind_status $arq
+    max_vez_cursado $arq
+    perc_aprov_reprov_ano $arq
+    media_nota_aprov $arq
+    media_nota_reprov $arq
+    media_freq_reprov $arq
+    perc_evasoes $arq
+    rend_pand $arq
     rend_after_pand $arq
 }
 
@@ -112,10 +112,8 @@ media()
     
     temp="temp.txt"
     #remove equivalencia, tira cabeçalho, separa as colunas grr:periodo:ano:nota:status, ordena pelos anos
-    grep -v EQUIVALENCIA $arq | grep -v matricula | cut -d, -f1,4,5,$arg,10 | sort -t, -k3 >> $temp
-    
-    cat $temp | grep $status > $temp
- 
+    grep -v EQUIVALENCIA $arq | grep -v matricula | cut -d, -f1,4,5,$arg,10 | sort -t, -k3 | grep $status >> $temp
+
     min=$(cut -d, -f3 $temp | head -n1)
     max=$(cut -d, -f3 $temp | tail -n1)
     
