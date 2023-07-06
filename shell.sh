@@ -12,7 +12,9 @@ main()
     #media_nota_aprov $arq
     #media_nota_reprov $arq
     #media_freq_reprov $arq
-    
+    #perc_evasoes $arq
+    #rend_pand $arq
+    rend_after_pand $arq
 }
 
 
@@ -21,6 +23,7 @@ function remove_2_2022()
 {
     echo "Lista de pessoas que nao fazem parte do segundo semestre de 2022"
     arq=$1 
+    #remove ocorrencias de 2022,2, remove cabeçalho
     grep -v "2,2022" $arq | grep -v matricula
 }
 
@@ -33,6 +36,7 @@ qtd_ind_status()
     temp="temp.txt"
     #remove equivalencia 2019, pega colunas grr e status, tira cabeçalho, remove linhas repetidas, joga em temp
     grep -v "CI1055,ALGORITMOS E ESTRUTURAS DE DADOS 1,1,2019,Sim,60,0,0,Aprovado,EQUIVALENCIA" $arq | cut -d, -f'1,10' | grep -v "status" | uniq -u >> $temp
+    #ordena por status, deixa somente os status, e conta
     sort -t, -k2 $temp | cut -d, -f2 | uniq -c 
     
     rm $temp
@@ -60,6 +64,7 @@ max_vez_cursado()
 perc_aprov_reprov_ano()
 {
     echo "Porcentagem de aprovados e reprovados em cada ano"
+    echo -e "ANO\tAPRO\tREPR"
     arq=$1
     temp="temp.txt"
     #remove equivalencia 2019, tira cabeçalho, ordena por ano, pega as colunas de ano e status, remove os ainda matriculados
@@ -83,7 +88,7 @@ perc_aprov_reprov_ano()
         aprov=$(echo "scale = 2; $aprov * 100 / $total" | bc)
         reprov=$(echo "scale = 2; $reprov * 100 / $total" | bc)
         
-        echo "$aprov% aprovados e $reprov% reprovados em $i"
+        echo -e "$i\t:$aprov\t:$reprov"
         rm $ano
     done
     
@@ -92,8 +97,11 @@ perc_aprov_reprov_ano()
 
 media()
 {
+    #parametro de arquivo trabalhado
     arq=$1
+    #parametro de status que se quer buscar
     status=$2
+    #parametro de tipo de dado que se quer, frequencia ou nota
     if [ $3 = 'freq' ]
     then
         arg=9
@@ -106,26 +114,24 @@ media()
     #remove equivalencia, tira cabeçalho, separa as colunas grr:periodo:ano:nota:status, ordena pelos anos
     grep -v EQUIVALENCIA $arq | grep -v matricula | cut -d, -f1,4,5,$arg,10 | sort -t, -k3 >> $temp
     
-    temp1="temp1.txt"
-    cat $temp | grep $status >> $temp1
-    rm $temp
+    cat $temp | grep $status > $temp
  
-    min=$(cut -d, -f3 $temp1 | head -n1)
-    max=$(cut -d, -f3 $temp1 | tail -n1)
+    min=$(cut -d, -f3 $temp | head -n1)
+    max=$(cut -d, -f3 $temp | tail -n1)
     
     echo "ANO  mediaANO  media1p  media2p"
-    #calculo da porcentagem para cada ano
+    #calculo da porcentagem para cada semestre 
     mediaG=0
     for ((ano=$min; ano<=$max; ano++))
     do
         taxa1='taxa1sem.txt'
         taxa2='taxa2sem.txt'
 
-        qtd1=$(grep -c "1,$ano" $temp1) 
-        qtd2=$(grep -c "2,$ano" $temp1)
+        qtd1=$(grep -c "1,$ano" $temp) 
+        qtd2=$(grep -c "2,$ano" $temp)
 
-        grep "1,$ano" $temp1 | cut -d, -f1,2,4 >> $taxa1
-        grep "2,$ano" $temp1 | cut -d, -f1,2,4 >> $taxa2
+        grep "1,$ano" $temp | cut -d, -f1,2,4 >> $taxa1
+        grep "2,$ano" $temp | cut -d, -f1,2,4 >> $taxa2
 
         soma1=0
         soma2=0
@@ -144,6 +150,7 @@ media()
         media1=0
         media2=0
 
+        #para nao dividir por 0
         if (($qtd1 != 0))
         then
             media1=$(echo "scale = 0; $soma1 / $qtd1" | bc)
@@ -153,6 +160,7 @@ media()
             media2=$(echo "scale = 0; $soma2 / $qtd2" | bc)
         fi
 
+        #para nao somar com semestre sem data
         if (($media1 == 0)) && (($media2 != 0))
         then
             mediaT=$media2
@@ -163,16 +171,16 @@ media()
             mediaT=$(echo "scale = 1; ($media1 + $media2) / 2" | bc)
         fi       
 
-        echo -e "$ano\t$mediaT\t$media1\t$media2"
+        echo -e "$ano\t:$mediaT\t:$media1\t:$media2"
         mediaG=$(echo "scale = 2; $mediaT + $mediaG" | bc )
         rm $taxa1
         rm $taxa2
     done
 
     mediaG=$(echo "scale = 2; $mediaG/($max - $min + 1)" | bc )
-    echo -e "\tMedia Total: $mediaG"
+    echo -e "\tMedia Total :$mediaG"
 
-    rm $temp1
+    rm $temp
 }
 
 #media de nota de aprovados por ano e periodo
@@ -198,62 +206,159 @@ media_freq_reprov()
 
 
 #porcentagem de evasões total e anual
-#perc_evasoes()
-#{
-#    arq=$1
-#    grep -v EQUIVALENCIA $arq | grep -v matricula | 
-#}
+perc_evasoes()
+{
+    echo "porcentagem de evasao total e anual"
+    echo -e "ANO \t %"
+    arq=$1
+    temp='temp.txt'
+    #remove equivalencias, remove cabeçalho, corta as linhas de anos e status, ordena
+    grep -v EQUIVALENCIA $arq | grep -v matricula | cut -d, -f5,10 | sort >> $temp
+    #valores minimo e maximo
+    min=$(cut -d, -f1 $temp | head -n1)
+    max=$(cut -d, -f1 $temp | tail -n1)
+    soma=0
+    total=0
+    for ((i=$min; i<=$max; i++))
+    do
+        alun_em_ano=$(grep -c "$i" $temp)                         #quantidade de alunos em cada ano
+        num=$(grep Cancelado $temp | grep -c "$i")                #quantidade de cancelados em um ano
+        soma=$(expr $num + $soma)                                 #soma total de cancelados
+        total=$(expr $total + $alun_em_ano)                       #quantidade total de alunos
+        num=$(echo "scale = 2; $num * 100 / $alun_em_ano" | bc)   #calculo da porcentagem por ano
+        echo -e "$i\t:$num"
+    done
+    soma=$(echo "scale = 2; $soma * 100 / $total" | bc)
+    echo -e "TOTAL DE EVASOES \t :$soma"
+    rm $temp
+}
 
 #rendimento dos anos de pandemia em relação com os anteriores
-#rend_pand()
-#{
+rend_pand()
+{
+    echo "rendimento dos alunos de pandemia(2020,2021) em relação com anteriores"
+    arq=$1
+    evas='AAevasao.txt'
+    aprov='AAaprov.txt'
+    reprov='AAreprov.txt'
+    mn_a='AAmedia_nota_aprov.txt'
+    mn_r='AAmedia_nota_reprov.txt'
+    mf_r='AAmedia_freq_reprov.txt'
+    perc_evasoes $arq | tail -n13 | head -n11 | cut -d. -f1 > $evas
+    perc_aprov_reprov_ano $arq | tail -n12 | grep -v 2022 | cut -d: -f1,2 | cut -d. -f1 > $aprov
+    perc_aprov_reprov_ano $arq | tail -n12 | grep -v 2022 | cut -d: -f1,3 | cut -d. -f1 > $reprov
+    media_nota_aprov $arq | grep 20 | grep -v 2022 | cut -d: -f1,2 | cut -d. -f1 > $mn_a
+    media_nota_reprov $arq | grep 20 | grep -v 2022 | cut -d: -f1,2 | cut -d. -f1 > $mn_r
+    media_freq_reprov $arq | grep 20 | grep -v 2022 | cut -d: -f1,2 | cut -d. -f1  > $mf_r
 
-#}
+    dados_pre='AAdados.txt'
+    for doc in {$evas,$aprov,$reprov,$mn_a,$mn_r,$mf_r}
+    do
+        min=$(cut -b1-4 $doc | head -n1)
+        max=$(cut -b1-4 $doc | grep -v 2020 | grep -v 2021 | tail -n1)
+
+        soma=0
+        for ((i=$min; i<=$max; i++))
+        do
+            num=$(grep "$i" $doc | cut -d: -f2)
+            soma=$(echo "scale = 0; $soma + $num" | bc)
+        done
+        soma=$(echo "$soma / ($max - $min + 1) " | bc)
+        echo "$soma" >> $dados_pre
+    done
+
+    dados_pand='AAdados.csv'
+
+    for doc in {$evas,$aprov,$reprov,$mn_a,$mn_r,$mf_r}
+    do
+        num0=$(grep 2020 $doc | cut -d: -f2)
+        num1=$(grep 2021 $doc | cut -d: -f2)
+        echo "$num0,$num1" >> $dados_pand
+    done
+    echo -e "\tpre\t2020\t2021\t%2020\t%2021"
+    n=1
+    dados_tot='AAdadost.csv'
+    for i in {"evas","aprov","reprov","mn_a","mn_r","mf_r"}
+    do
+        pre=$(head -n"$n" $dados_pre | tail -n1)
+        n2020=$(head -n"$n" $dados_pand | tail -n1 | cut -d, -f1)
+        n2021=$(head -n"$n" $dados_pand | tail -n1 | cut -d, -f2)
+        p2020=$(echo "scale = 2; $n2020 * 100 / $pre" | bc)
+        p2021=$(echo "scale = 2; $n2021 * 100 / $pre" | bc)
+        echo -e "$i\t$pre\t$n2020\t$n2021\t$p2020\t$p2021"
+        n=$(expr $n + 1)
+    done
+    rm *dados*.*
+    rm AA*.txt
+}
 
 #rendimento dos alunos em 2022-1 em relação a pandemia e anos anteriores
-#rend_after_pand()
-#{
+rend_after_pand()
+{
+    echo "rendimento de alunos em 2022-1 e em pandemia em relacao a antes da pandemia"
+    arq=$1
+    evas='AAevasao.txt'
+    aprov='AAaprov.txt'
+    reprov='AAreprov.txt'
+    mn_a='AAmedia_nota_aprov.txt'
+    mn_r='AAmedia_nota_reprov.txt'
+    mf_r='AAmedia_freq_reprov.txt'
+    perc_evasoes $arq | grep 20 | cut -d. -f1 > $evas
+    perc_aprov_reprov_ano $arq | tail -n12 | cut -d: -f1,2 | cut -d. -f1 > $aprov
+    perc_aprov_reprov_ano $arq | tail -n12 | cut -d: -f1,3 | cut -d. -f1 > $reprov
+    media_nota_aprov $arq | grep 20 | cut -d: -f1,2 | cut -d. -f1 > $mn_a
+    media_nota_reprov $arq | grep 20 | cut -d: -f1,2 | cut -d. -f1 > $mn_r
+    media_freq_reprov $arq | grep 20 | cut -d: -f1,2 | cut -d. -f1  > $mf_r
 
-#}
+    dados_pre='AAdados.txt'
+    for doc in {$evas,$aprov,$reprov,$mn_a,$mn_r,$mf_r}
+    do
+        min=$(cut -b1-4 $doc | head -n1)
+        max=$(cut -b1-4 $doc | grep -v 2020 | grep -v 2021 | grep -v 2022 | tail -n1)
+
+        soma=0
+        for ((i=$min; i<=$max; i++))
+        do
+            num=$(grep "$i" $doc | cut -d: -f2)
+            soma=$(echo "scale = 0; $soma + $num" | bc)
+        done
+        soma=$(echo "$soma / ($max - $min + 1) " | bc)
+        echo "$soma" >> $dados_pre
+    done
+
+    dados_pand='AAdados.csv'
+
+    for doc in {$evas,$aprov,$reprov,$mn_a,$mn_r,$mf_r}
+    do
+        num0=$(grep 2020 $doc | cut -d: -f2)
+        num1=$(grep 2021 $doc | cut -d: -f2)
+        echo "$num0,$num1" >> $dados_pand
+    done
+
+    dados_after='AAdadosA.csv'
+
+    for doc in {$evas,$aprov,$reprov,$mn_a,$mn_r,$mf_r}
+    do
+        grep "2022" $doc | cut -d: -f2 >> $dados_after
+    done
+
+    echo -e "\tpre\t2020\t2021\t2022-1\t%2020\t%2021\t%2022-1"
+    n=1
+    dados_tot='AAdadost.csv'
+    for i in {"evas","aprov","reprov","mn_a","mn_r","mf_r"}
+    do
+        pre=$(head -n"$n" $dados_pre | tail -n1)
+        n2020=$(head -n"$n" $dados_pand | tail -n1 | cut -d, -f1)
+        n2021=$(head -n"$n" $dados_pand | tail -n1 | cut -d, -f2)
+        n2022=$(head -n"$n" $dados_after | tail -n1)
+        p2020=$(echo "scale = 1; $n2020 * 100 / $pre" | bc)
+        p2021=$(echo "scale = 1; $n2021 * 100 / $pre" | bc)
+        p2022=$(echo "scale = 1; $n2022 * 100 / $pre" | bc)
+        echo -e "$i\t:$pre\t:$n2020\t:$n2021\t:$n2022\t:$p2020\t:$p2021\t:$p2022"
+        n=$(expr $n + 1)
+    done
+    rm *dados*.*
+    rm AA*.txt
+}
 
 main
-
-#
-#Expansão    corresponde à
-#[b-e.;!]    Qualquer letra minúscula de “b” a “e”, “.”, “;” e “!”
-#[!b-e]      Qualquer dígito, exceto letras minúsculas de “b” a “e”
-#[A-Z0-9]    Qualquer letra maiúscula de “A” a “Z” e qualquer número de um dígito
-#[a-df-i]    a, b, c, d, f, g, h, i
-#[abc-]     “a”, “b”, “c”, ou “-”
-#
-
-#Expansão                        Resultado
-#cat func.{c,h}                  conteúdo dos arquivos fun.c func.h
-#ls rec0{1..4}.mp3               rec01.mp3 rec02.mp3 rec03.mp3 rec04.mp3
-#touch 201{5..7}/ex{1..4}.txt    cria ex1.txt, ex2.txt, ex3.txt e ex4.txt
-#                                nos diretórios 2015, 2016 e 2017
-#echo turma{A..D}                turmaA turmaB turmaC turma D
-#echo turma{A..G..2}             turmaA turmaC turmaE turma G
-
-
-# man [comando] - Mostra uma página de manual para [comando] contendo
-#  uma descrição detalhada de seu funcionamento, as opções que [comando]
-#  pode utilizar e uma descrição detalhada do que a opção faz;
-# cat - Copia entrada para saída;
-# grep [PADRÃO] [arquivo] - Procura por [PADRÃO] em [arquivo];
-# sort [arquivo] - Ordena as linhas de [arquivo];
-# cut [arquivo] - Extrai determinadas colunas de [arquivo];
-# sed - Editor para filtrar e editar arquivos;
-# tr [set1] [set2] - Traduz [set1] para [set2], ou deleta [set1];
-# head [arquivo] - Exibe o começo de [arquivo];
-# tail [arquivo] - Exibe o fim de [arquivo];
-# echo [linha] - Exibe [linha] ;
-# ls [arquivo] - Lista os conteúdos de um diretório;
-# cd [caminho] - troca do diretório atual para [caminho];
-# wc [arquivo] - Exibe o número de linhas, palavras e bytes de [arquivo];
-# pwd - Exibe posição do usuário na árvore de arquivos;
-# mkdir [nome] - cria um diretório chamado [nome];
-# touch [nome] - cria um arquivo chamado [nome];
-# rm [arquivo] - remove [arquivo] (este arquivo é removido do sistema, não
-#   existe “lixeira” para o rm);
-# rmdir [diretório] - remove um diretório, desde que esteja vazio.
